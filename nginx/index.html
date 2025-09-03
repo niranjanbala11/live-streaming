@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Stream Player</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.10/hls.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #4CAF50;
+        }
+        
+        #video {
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            background: #000;
+            border-radius: 10px;
+        }
+        
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .status.connected {
+            background: #4CAF50;
+        }
+        
+        .status.disconnected {
+            background: #f44336;
+        }
+        
+        .status.loading {
+            background: #ff9800;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 Live Webcam Stream</h1>
+        
+        <video id="video" controls autoplay muted playsinline></video>
+        
+        <div class="controls">
+            <button onclick="startStream()">▶️ Start Stream</button>
+            <button onclick="stopStream()">⏹️ Stop Stream</button>
+            <button onclick="toggleMute()">🔊 Toggle Mute</button>
+        </div>
+        
+        <div id="status" class="status disconnected">
+            Ready to connect...
+        </div>
+        
+        <div style="margin-top: 30px; font-size: 14px; opacity: 0.8;">
+            <h3>Stream Info:</h3>
+            <p><strong>HLS URL:</strong> /hls/stream.m3u8</p>
+            <p><strong>RTMP URL:</strong> rtmp://localhost:1935/live/stream</p>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const status = document.getElementById('status');
+        let hls = null;
+        let isConnected = false;
+        
+        function updateStatus(message, type) {
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+        
+        function startStream() {
+            if (Hls.isSupported()) {
+                hls = new Hls({
+                    enableWorker: true,
+                    lowLatencyMode: true,
+                    backBufferLength: 90
+                });
+                
+                hls.loadSource('/hls/stream.m3u8');
+                hls.attachMedia(video);
+                
+                hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+                    console.log('Video and HLS are now bound together');
+                });
+                
+                hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+                    console.log('Manifest loaded, found ' + data.levels.length + ' quality level(s)');
+                    updateStatus('Stream connected - Live!', 'connected');
+                    isConnected = true;
+                });
+                
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    console.log('HLS Error:', data);
+                    if (data.fatal) {
+                        switch(data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                updateStatus('Network error - Retrying...', 'loading');
+                                setTimeout(() => {
+                                    hls.startLoad();
+                                }, 3000);
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                updateStatus('Media error - Recovering...', 'loading');
+                                hls.recoverMediaError();
+                                break;
+                            default:
+                                updateStatus('Fatal error - Stream failed', 'disconnected');
+                                hls.destroy();
+                                isConnected = false;
+                                break;
+                        }
+                    }
+                });
+                
+                updateStatus('Connecting to stream...', 'loading');
+                
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                // Safari fallback
+                video.src = '/hls/stream.m3u8';
+                updateStatus('Stream connected (Safari)', 'connected');
+                isConnected = true;
+            } else {
+                updateStatus('HLS not supported in this browser', 'disconnected');
+            }
+        }
+        
+        function stopStream() {
+            if (hls) {
+                hls.destroy();
+                hls = null;
+            }
+            video.src = '';
+            updateStatus('Stream disconnected', 'disconnected');
+            isConnected = false;
+        }
+        
+        function toggleMute() {
+            video.muted = !video.muted;
+        }
+        
+        // Auto-connect when page loads
+        window.addEventListener('load', () => {
+            setTimeout(startStream, 2000);
+        });
+        
+        // Reconnection logic
+        setInterval(() => {
+            if (!isConnected && hls) {
+                console.log('Attempting to reconnect...');
+                hls.startLoad();
+            }
+        }, 10000);
+    </script>
+</body>
+</html>

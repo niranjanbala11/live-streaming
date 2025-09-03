@@ -1,0 +1,18 @@
+version: "3.8"
+services:
+  nginx:
+    build: ./nginx
+    container_name: nginx-rtmp
+    ports:
+      - "1935:1935"
+      - "8080:8080"
+
+  ffmpeg:
+    build: ./ffmpeg
+    container_name: ffmpeg-capture
+    devices:
+      - "/dev/video0:/dev/video0"   # For Linux webcam
+    depends_on:
+      - nginx
+    environment:
+      - RTMP_SERVER=nginx

@@ -25,7 +25,7 @@ echo "Using webcam: $CAMDEVICE"
 #echo "Streaming to RTMP server at: $RTMP_URL"
 
 # Set the RTMP URL
-RTMP_URL="rtmp://localhost/live/stream"
+RTMP_URL="rtmp://${RTMP_SERVER}/live/stream"
 
 # Stream in a loop
 while true; do
